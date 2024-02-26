@@ -95,7 +95,7 @@ int main(int argc, char** argv)
 	gst_init(&argc, &argv);
 	// Configure QT application and start QT thread
 	qRegisterMetaType<cv::Mat>("cv::Mat");
-	gst_debug_set_default_threshold(GST_LEVEL_ERROR);
+	gst_debug_set_default_threshold(GST_LEVEL_INFO);
 	QApplication app (argc, argv);
 	MainWindow w (nullptr, &conf);
 	w.show();

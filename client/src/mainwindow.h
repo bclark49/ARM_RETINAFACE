@@ -36,6 +36,7 @@ struct Callback_Data {
 class Video_Proc : public QThread {
 	Q_OBJECT
 public:
+	bool pipe_running;
 	Video_Proc (QObject* parent=nullptr, Config* in_conf=nullptr);
 	~Video_Proc ();
 public slots:

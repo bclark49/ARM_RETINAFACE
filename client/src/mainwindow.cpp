@@ -2,6 +2,7 @@
 #include "ui_mainwindow.h"
 #include <QPixmap>
 #include <QImage>
+#include <QMessageBox>
 //#include <QGraphicsEffect>
 //
 
@@ -55,16 +56,25 @@ MainWindow::~MainWindow () {
 }
 
 void MainWindow::setupUI () {
-    setWindowState(Qt::WindowFullScreen);
-	ui->label1->setFixedSize(900, 1020);
+    //setWindowState(Qt::WindowFullScreen);
+	//ui->label1->setFixedSize(900, 1020);
 	//ui->label2->setFixedSize(940, 700);
 }
 
 // Called when window is closed. Used to syncronize exit
 void MainWindow::closeEvent (QCloseEvent *event) {
 	//vid_proc_ptr->terminate ();
-	vid_proc_ptr->wait ();
-	event->accept ();
+	if (vid_proc_ptr->pipe_running) {
+		QMessageBox popup;
+		popup.setWindowTitle ("STOP VIDEO!");
+		popup.setText ("Please press stop before closing the main window.");
+		popup.exec ();
+		event->ignore ();
+	}
+	else {
+		vid_proc_ptr->wait ();
+		event->accept ();
+	}
 }
 
 // Called when esc key pressed
@@ -95,6 +105,29 @@ void MainWindow::updateFrame (const cv::Mat m) {
 }
 
 Video_Proc::Video_Proc (QObject* parent, Config* in_conf) : QThread(parent) {
+	char reader_uri [512];
+	pipe_running = false;
+	sprintf (reader_uri, "v4l2src device=%s ! video/x-raw, format=%s, width=%d, height=%d, framerate=%d/1 ! tee name=t \
+			t. ! queue ! mpph264enc level=42 ! rtph264pay name=pay0 pt=96 ! udpsink name=udpsink host=169.254.73.214 port=9002 sync=false \
+			t. ! queue ! videoconvert ! appsink name=appsink sync=false",
+			in_conf->dev, in_conf->format, in_conf->res[0], in_conf->res[1], in_conf->fps);
+	pipeline = gst_parse_launch (reader_uri, NULL);
+	printf ("PARSE LAUNCH\n");
+	if (!pipeline) {
+		fprintf (stderr, "Failed to create pipeline. Exiting\n");
+		return;	
+	}
+	GstElement* udpsink = gst_bin_get_by_name (GST_BIN (pipeline), "udpsink");
+	if (!udpsink) {
+		fprintf (stderr, "Failed to retrieve udpsink. Exiting\n");
+		return;	
+	}
+	GstElement* appsink = gst_bin_get_by_name (GST_BIN (pipeline), "appsink");
+	if (!appsink) {
+		fprintf (stderr, "Failed to retrieve appsink. Exiting\n");
+		return;	
+	}
+	/*
 	GstElement *v4l2src, *capsfilter, *tee, *queue_udp, *mpph264enc, *rtph264pay, *udpsink, *queue_videoconvert, *videoconvert, *appsink;
 	pipeline = gst_pipeline_new ("Video pipe");
 	v4l2src = gst_element_factory_make ("v4l2src", "v4l2src");
@@ -109,12 +142,13 @@ Video_Proc::Video_Proc (QObject* parent, Config* in_conf) : QThread(parent) {
 	g_object_set (G_OBJECT (rtph264pay), "name", "pay0", "pt", 96, NULL);
 	udpsink = gst_element_factory_make ("udpsink", "udpsink");
 	g_object_set (G_OBJECT (udpsink), "host", "169.254.73.214", "port", 9002, NULL);
+	//g_object_set (G_OBJECT (udpsink), "host", "127.0.0.1", "port", 9002, NULL);
 
 	// APPSINK display pipe
 	queue_videoconvert = gst_element_factory_make ("queue", "queue_videoconvert");
 	videoconvert = gst_element_factory_make ("videoconvert", "videoconvert");
 	appsink = gst_element_factory_make ("appsink", "appsink");
-	//g_object_set (G_OBJECT (appsink), "sync", false, NULL);
+	g_object_set (G_OBJECT (appsink), "sync", false, NULL);
 
 	if (!pipeline || !v4l2src || !capsfilter || !tee || !queue_udp || !mpph264enc || !rtph264pay || !udpsink || !queue_videoconvert || !videoconvert || !appsink ) {
 		fprintf (stderr, "Failed to create one or more elements. Exiting");
@@ -140,6 +174,7 @@ Video_Proc::Video_Proc (QObject* parent, Config* in_conf) : QThread(parent) {
 		return;	
 	}
 
+	*/
 	// Configure appsink callback when frames are received
 	cb_dat.callback = {nullptr, nullptr, new_sample_callback, nullptr};
 	cb_dat.vid_proc_ptr = this;
@@ -158,7 +193,6 @@ gboolean Video_Proc::int_src_cb (gpointer data) {
 	Video_Proc* vid_proc_ptr = static_cast<Video_Proc*>(data);
 	//QMutexLocker locker (&vid_proc_ptr->mutex);
 	if (vid_proc_ptr->term_sig == true) {
-		printf("INT NOW\n");
 		g_main_loop_quit (vid_proc_ptr->loop);
 		return G_SOURCE_REMOVE;
 	}
@@ -186,7 +220,7 @@ gboolean Video_Proc::int_src_cb (gpointer data) {
 
 // Seperate class for gstreamer. only runs in this thread
 void Video_Proc::run () {
-	guint to_src = g_timeout_add (100, reinterpret_cast<GSourceFunc>(&Video_Proc::int_src_cb), this);
+	g_timeout_add (100, reinterpret_cast<GSourceFunc>(&Video_Proc::int_src_cb), this);
 
 	if (gst_element_set_state (pipeline, GST_STATE_PLAYING) == GST_STATE_CHANGE_FAILURE){
 		fprintf (stderr, "Failed to set state to playing. Exiting");
@@ -195,9 +229,10 @@ void Video_Proc::run () {
 	term_sig = false;
 	toggle_sig = false;
 	paused = false;
+	pipe_running = true;
 	g_main_loop_run (loop);
+	pipe_running = false;
 	//g_source_remove (to_src);
-	printf("LOOP DONE\n");
 	g_main_loop_unref (loop);
 	gst_element_set_state (pipeline, GST_STATE_NULL);
 	gst_object_unref (GST_OBJECT(pipeline));

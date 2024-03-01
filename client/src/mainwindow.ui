@@ -69,7 +69,7 @@
         </property>
         <property name="maximumSize">
          <size>
-          <width>960</width>
+          <width>950</width>
           <height>972</height>
          </size>
         </property>
@@ -88,15 +88,12 @@
         </property>
         <property name="maximumSize">
          <size>
-          <width>960</width>
+          <width>950</width>
           <height>972</height>
          </size>
         </property>
         <property name="text">
          <string>After</string>
-        </property>
-        <property name="alignment">
-         <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
         </property>
        </widget>
       </item>

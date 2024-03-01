@@ -2,12 +2,13 @@
 #include <unistd.h>
 #include <chrono>
 
+int WIDTH;
+int HEIGHT;
+
 static void push_sample_callback (GstElement* src, guint unused_size, gpointer dat) {
 	Callback_Data* cb_dat_ptr = static_cast<Callback_Data*>(dat);
 	App_Pipe* ap_ptr = cb_dat_ptr->ap_ptr;
 	GstBuffer* buf;
-	//GstSample* samp;
-	GstCaps* caps;
 	GstFlowReturn ret;
 	cv::Mat img;
 
@@ -20,7 +21,7 @@ static void push_sample_callback (GstElement* src, guint unused_size, gpointer d
 	if (ap_ptr->q.empty ()) {
 		return;
 	}
-	printf ("SINK queue: %d\n", ap_ptr->q.size ());
+	printf ("SINK queue: %lu\n", ap_ptr->q.size ());
 
 	img = ap_ptr->q.front ();
 
@@ -28,27 +29,28 @@ static void push_sample_callback (GstElement* src, guint unused_size, gpointer d
 	ap_ptr->avail = false;
 	lk.unlock ();
 	guint size = img.total () * img.elemSize ();	
-	//printf ("SIZE: %d\n", size);
 	buf = gst_buffer_new_allocate (NULL, size, NULL);
 	gst_buffer_fill (buf, 0, img.data, size);
-	/*
-	caps = gst_caps_new_simple ("video/x-raw", 
-			"format", G_TYPE_STRING, "BGR",
-			"framerate", GST_TYPE_FRACTION, 30, 1,
-			"width", G_TYPE_INT, 1920, 
-			"height", G_TYPE_INT, 1080, NULL);
-	*/
-	//samp = gst_sample_new (buf, caps, NULL, NULL);
 	//printf ("WRITING\n");
 	g_signal_emit_by_name (src, "push-buffer", buf, &ret);
 	gst_buffer_unref (buf);
 	if (ret != GST_FLOW_OK)
 		g_main_loop_quit (cb_dat_ptr->loop);
-	//gst_sample_unref (samp);
-	//return (GST_FLOW_OK);
 }
 
 int main (int argc, char* argv[]) {
+	if (argc != 5) {
+		fprintf (stderr, "usage: ./server width height fps host_ip\n");
+		return -1;
+	}
+	char host_ip [32];
+	int width, height, fps;
+	width = atoi (argv[1]);
+	WIDTH = width;
+	height = atoi (argv[2]);
+	HEIGHT = height;
+	fps = atoi (argv[3]);
+	strcpy (host_ip, argv[4]);
 	if (!gst_debug_is_active () ) {
 		gst_debug_set_active (true);
 		GstDebugLevel dgblevel = gst_debug_get_default_threshold ();
@@ -61,19 +63,24 @@ int main (int argc, char* argv[]) {
 	}
 	//XInitThreads();
 	gst_init(&argc, &argv);
+	// Configure shared object *image passing mechanism*
 	App_Pipe ap;
 	ap.avail = false;
 	ap.kill_pipe = false;
-	// Configure shared object *image passing mechanism*
 	Callback_Data cb_dat;
 	cb_dat.ap_ptr = &ap;
 	// Configure producer pipeline
-	Video_Proc vid_proc (&cb_dat);
+	char reader_uri [512];
+	//sprintf (reader_uri, "udpsrc port=9002 ! application/x-rtp, media=video, clock-rate=90000, encoding-name=H264, payload=96 ! rtph264depay ! h264parse ! video/x-h264, width=1920, height=1080, framerate=30/1 ! queue ! mppvideodec format=16 ! appsink name=sink sync=false");
+	//sprintf (reader_uri, "udpsrc port=9002 ! application/x-rtp, media=video, clock-rate=90000, encoding-name=H264, payload=96 ! rtph264depay ! h264parse ! video/x-h264, width=%d, height=%d, framerate=%d/2 ! queue ! mppvideodec format=16 ! appsink name=sink sync=false", width, height, fps);
+	sprintf (reader_uri, "udpsrc port=9002 ! application/x-rtp, media=video, clock-rate=90000, encoding-name=H264, payload=96 ! rtph264depay ! h264parse ! queue ! mppvideodec format=16 ! appsink name=sink sync=false");
+	Video_Proc vid_proc (&cb_dat, reader_uri);
 	// Configure Consumer Pipeline
 	char writer_uri [512];
 	//sprintf (writer_uri, "appsrc name=src is-live=true caps=\"video/x-raw, width=1920, height=1080, framerate=30/1, format=BGR\" ! videoconvert ! xvimagesink");
-	sprintf (writer_uri, "appsrc name=src is-live=true min-percent=50 blocksize=6220800 caps=\"video/x-raw, width=1920, height=1080, framerate=30/1, format=BGR\" ! queue ! mpph264enc level=41 width=1920 height=1080 profile=baseline ! h264parse ! queue ! rtph264pay name=pay1 pt=96 ! application/x-rtp, media=video, clock-rate=90000, encoding-name=H264 ! udpsink host=169.254.51.100 port=9004 sync=false");
+	//sprintf (writer_uri, "appsrc name=src is-live=true min-percent=50 blocksize=6220800 caps=\"video/x-raw, width=1920, height=1080, framerate=30/1, format=BGR\" ! queue ! mpph264enc level=41 width=1920 height=1080 profile=baseline ! h264parse ! queue ! rtph264pay name=pay1 pt=96 ! application/x-rtp, media=video, clock-rate=90000, encoding-name=H264 ! udpsink host=169.254.51.100 port=9004 sync=false");
 	//sprintf (writer_uri, "appsrc name=src ! video/x-raw, width=1920, height=1080, framerate=30/1, format=BGR ! queue ! mpph264enc level=41 ! h264parse !  queue ! filesink location=test.mp4");
+	sprintf (writer_uri, "appsrc name=src is-live=true caps=\"video/x-raw, width=%d, height=%d, framerate=%d/2, format=BGR\" ! queue ! mpph264enc ! h264parse ! queue ! rtph264pay name=pay1 pt=96 ! application/x-rtp, media=video, clock-rate=90000, encoding-name=H264 ! udpsink host=%s port=9004 sync=false", width, height, fps, host_ip);
 	GMainLoop* loop = g_main_loop_new (NULL, false);
 	GstElement* pipeline = gst_parse_launch (writer_uri, NULL);
 	if (!pipeline) {

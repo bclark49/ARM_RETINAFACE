@@ -2,18 +2,15 @@
 #define MY_GST_H
 
 #include <opencv2/opencv.hpp>
+//#include <opencv2/core/core.hpp>
 #include <gst/gst.h>
 #include <gst/app/gstappsink.h>
 #include <glib.h>
 #include <thread>
-#include <X11/Xlib.h>
+//#include <X11/Xlib.h>
 #include <queue>
 #include <mutex>
 #include <condition_variable>
-
-static gboolean bus_callback (GstBus* bus, GstMessage* message, gpointer data);
-
-GstFlowReturn new_sample_callback (GstAppSink* sink, gpointer data);
 
 class Video_Proc;
 
@@ -37,7 +34,7 @@ struct Callback_Data {
 // Gstreamer wrapper object
 class Video_Proc {
 public:
-	Video_Proc (Callback_Data* cb_dat);
+	Video_Proc (Callback_Data* cb_dat, char* uri);
 	~Video_Proc () {
 		if (gst_pipe_thread.joinable ()) 
 			gst_pipe_thread.join ();

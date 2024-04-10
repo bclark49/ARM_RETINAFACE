@@ -1,27 +1,42 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
+#include <QApplication>
 #include <QMainWindow>
 #include <QTimer>
 #include <QKeyEvent>
 #include <QObject>
 #include <QThread>
 #include <QMutex>
-#include <opencv2/opencv.hpp>
+#include <QPixmap>
+#include <QImage>
+#include <QPainter>
+#include <QMessageBox>
+
+#include <opencv2/core/core.hpp>
+#include <opencv2/core/ocl.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+
 #include <gst/gst.h>
 #include <gst/app/gstappsink.h>
 #include <glib.h>
+
+#include <stdio.h>
+#include <fstream>
+#include <string>
+#include <chrono>
+#include <unistd.h>
 #include <thread>
 
 Q_DECLARE_METATYPE(cv::Mat)
-
-GstFlowReturn new_sample_callback (GstAppSink* sink, gpointer data);
 
 struct Config {
 	int res[2];
 	int fps;
 	char dev[16];
 	char format[16];
+	char server_ip [16];
 };
 
 class Video_Proc;
@@ -36,17 +51,20 @@ struct Callback_Data {
 class Video_Proc : public QThread {
 	Q_OBJECT
 public:
-	Video_Proc (QObject* parent=nullptr, Config* in_conf=nullptr);
+	int display_height;
+	int display_width;
+	bool pipe_running;
+	bool udpsrc;
+	guint64 counter;
+	Video_Proc (QObject* parent=nullptr, char* pipe_str=nullptr, bool udpsink=0);
 	~Video_Proc ();
 public slots:
 	void set_term_sig (bool var) {
-		printf("SETSIG\n");
-		//QMutexLocker locker(&mutex);
+		//printf("SETSIG\n");
 		term_sig = var;
 	}
 	void set_toggle_sig (bool var) {
-		printf("SETSIG\n");
-		//QMutexLocker locker(&mutex);
+		//printf("SETSIG\n");
 		toggle_sig = var;
 	}
 signals:
@@ -54,9 +72,10 @@ signals:
 	void new_frame_sig (const cv::Mat frame);
 	void finished();
 private:
-	GstElement* pipeline;
+	GstElement *pipeline;
 	GMainLoop* loop;
 	Callback_Data cb_dat;
+	float scale_factor;
 	bool term_sig;
 	bool toggle_sig;
 	bool paused;
@@ -75,7 +94,7 @@ class MainWindow : public QMainWindow
     Q_OBJECT
 
 public:
-    MainWindow(QWidget *parent = nullptr, Config* in_conf = nullptr);
+    MainWindow(QWidget *parent = nullptr, char* udp_src_str = nullptr, char* cam_src_str = nullptr);
     ~MainWindow ();
 protected:
 	void keyPressEvent (QKeyEvent *event) override;
@@ -84,11 +103,21 @@ signals:
 private slots:
     void toggleVideo ();
     void stopVideo ();
-    void updateFrame (const cv::Mat frame);
+    void updateFrameBefore (cv::Mat frame);
+    void updateFrameAfter (cv::Mat frame);
 private:
     Ui::MainWindow *ui;
-	Video_Proc* vid_proc_ptr;
 	QThread* worker_thread;
+	Video_Proc* udp_src_ptr;
+	QPainter label2_painter;
+	float udpsrc_FPS [16];
+	int udpsrc_Fcnt;
+	std::chrono::steady_clock::time_point Tudpsrc_prev_end;
+	Video_Proc* cam_src_ptr;
+	QPainter label1_painter;
+	float camsrc_FPS [16];
+	int camsrc_Fcnt;
+	std::chrono::steady_clock::time_point Tcamsrc_prev_end;
     void setupUI ();
 	virtual void closeEvent (QCloseEvent *event) override;
 };

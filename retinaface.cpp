@@ -25,19 +25,6 @@
 #include <vector>
 #include <chrono>
 
-struct FaceObject
-{
-    cv::Rect_<float> rect;
-    cv::Point2f landmark[5];
-    float prob;
-};
-
-static inline float intersection_area(const FaceObject& a, const FaceObject& b)
-{
-    cv::Rect_<float> inter = a.rect & b.rect;
-    return inter.area();
-}
-
 static void qsort_descent_inplace(std::vector<FaceObject>& faceobjects, int left, int right)
 {
     int i = left;

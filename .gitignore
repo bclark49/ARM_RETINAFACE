@@ -30,3 +30,13 @@
 *.exe
 *.out
 *.app
+
+# QT files
+moc*
+ui*
+
+# Unused OCL kernel
+*.cl
+
+# test Video
+*.mp4

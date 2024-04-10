@@ -4,6 +4,8 @@
 
 extern const int WIDTH;
 extern const int HEIGHT;
+int num_in_buffers = 0;
+int pack_num = 0;
 
 gboolean bus_callback (GstBus* bus, GstMessage* message, gpointer data) {
 	GMainLoop* loop = (GMainLoop*) data;
@@ -36,7 +38,7 @@ gboolean bus_callback (GstBus* bus, GstMessage* message, gpointer data) {
 // data: holds object for emitting frame to app
 // return: error for gstreamer
 GstFlowReturn new_sample_callback (GstAppSink* sink, gpointer data) {
-	printf ("NEED DATA\n");
+	//printf ("NEED DATA\n");
 	GstSample* sample = gst_app_sink_pull_sample (GST_APP_SINK(sink));
 	Callback_Data* cb_dat = static_cast<Callback_Data*>(data);
 	if (sample != nullptr) {
@@ -45,16 +47,19 @@ GstFlowReturn new_sample_callback (GstAppSink* sink, gpointer data) {
 			GstMapInfo map;
 			if (gst_buffer_map (buffer, &map, GST_MAP_READ)) {
 				cv::Mat m (cv::Size (WIDTH, HEIGHT), CV_8UC3, map.data);
+				//cv::resize (m, m, cv::Size (WIDTH/4
 				//printf ("SIZE: %d\n", m.total () * m.elemSize ());
 				std::unique_lock<std::mutex> lk (cb_dat->ap_ptr->m);
 
 				//std::vector<FaceObject> faceobjects;
 				//detect_retinaface(m, faceobjects);
-				//num_detects = faceobjects.size();
+				//int num_detects = faceobjects.size();
 				//m = draw_faceobjects(m, faceobjects);
 
 				cb_dat->ap_ptr->q.push (m.clone());
-				printf ("QUEUE: %d\n", (int)cb_dat->ap_ptr->q.size ());
+				num_in_buffers++;
+				//printf ("BUFFERS RECEIVED: %d\n", num_in_buffers);
+				//printf ("QUEUE: %d\n", (int)cb_dat->ap_ptr->q.size ());
 				cb_dat->ap_ptr->avail = true;
 				lk.unlock ();
 				cb_dat->ap_ptr->cv.notify_one ();
@@ -70,6 +75,18 @@ GstFlowReturn new_sample_callback (GstAppSink* sink, gpointer data) {
 	return GST_FLOW_ERROR;
 }
 
+GstPadProbeReturn probe_callback (GstPad* pad, GstPadProbeInfo* info, gpointer user_dat) {
+	GstBuffer* buffer = GST_PAD_PROBE_INFO_BUFFER (info);
+
+	guint size = gst_buffer_get_size (buffer);
+
+	std::chrono::high_resolution_clock::time_point t = std::chrono::high_resolution_clock::now ();
+	auto ts = t.time_since_epoch ();
+	printf ("%0.5d, %0.16ld, %0.5d\n", pack_num, std::chrono::duration_cast<std::chrono::microseconds> (ts).count (), size * 8);
+	pack_num++;
+	return GST_PAD_PROBE_OK;
+}
+
 Video_Proc::Video_Proc (Callback_Data* cb_dat, char* uri) {
 	pipeline = gst_parse_launch (uri, NULL);
 	if (!pipeline) {
@@ -81,9 +98,20 @@ Video_Proc::Video_Proc (Callback_Data* cb_dat, char* uri) {
 		fprintf (stderr, "Failed to retrieve sink. Exiting\n");
 		return;
 	}
+	GstElement* udpsrc = gst_bin_get_by_name (GST_BIN (pipeline), "udpsrc");
+	if (!sink) {
+		fprintf (stderr, "Failed to retrieve sink. Exiting\n");
+		return;
+	}
 	// Configure appsink callback when frames are received
 	cb_dat->callback = {nullptr, nullptr, new_sample_callback, nullptr};
 	gst_app_sink_set_callbacks (GST_APP_SINK (sink), &cb_dat->callback, cb_dat, nullptr);
+
+	// Configure udpsink source pad probe 
+	GstPad* pad = gst_element_get_static_pad (udpsrc, "src");
+	gst_pad_add_probe (pad, GST_PAD_PROBE_TYPE_BUFFER, probe_callback, nullptr, NULL);
+	gst_object_unref (pad);
+
 
 	loop = g_main_loop_new (nullptr, false);
 

@@ -1,6 +1,7 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
+#include <QApplication>
 #include <QMainWindow>
 #include <QTimer>
 #include <QKeyEvent>
@@ -12,12 +13,20 @@
 #include <QPainter>
 #include <QMessageBox>
 
-#include <opencv2/opencv.hpp>
+#include <opencv2/core/core.hpp>
+#include <opencv2/core/ocl.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
 
 #include <gst/gst.h>
 #include <gst/app/gstappsink.h>
 #include <glib.h>
 
+#include <stdio.h>
+#include <fstream>
+#include <string>
+#include <chrono>
+#include <unistd.h>
 #include <thread>
 
 Q_DECLARE_METATYPE(cv::Mat)
@@ -42,8 +51,11 @@ struct Callback_Data {
 class Video_Proc : public QThread {
 	Q_OBJECT
 public:
+	int display_height;
+	int display_width;
 	bool pipe_running;
 	bool udpsrc;
+	guint64 counter;
 	Video_Proc (QObject* parent=nullptr, char* pipe_str=nullptr, bool udpsink=0);
 	~Video_Proc ();
 public slots:
@@ -60,9 +72,10 @@ signals:
 	void new_frame_sig (const cv::Mat frame);
 	void finished();
 private:
-	GstElement* pipeline;
+	GstElement *pipeline;
 	GMainLoop* loop;
 	Callback_Data cb_dat;
+	float scale_factor;
 	bool term_sig;
 	bool toggle_sig;
 	bool paused;

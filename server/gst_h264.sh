@@ -1,0 +1,1 @@
+gst-launch-1.0 udpsrc port=9004 name=udpsrc ! application/x-rtp, media=video, clock-rate=90000, encoding-name=H264, payload=96 ! rtph264depay ! h264parse ! queue ! mppvideodec width=1920 height=1080 format=16 ! fpsdisplaysink video-sink='kmssink sync=false' text-overlay=false sync=false -v

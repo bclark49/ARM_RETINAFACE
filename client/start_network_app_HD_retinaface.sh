@@ -7,7 +7,7 @@ height=1080
 fps=10
 device=/dev/video0
 format=BGR
-pid=$(ssh rock@$server_ip "nohup /home/rock/ARM_RETINAFACE/server/./server $width $height $fps $client_ip > /dev/null 2>&1 & echo \$!")
+pid=$(ssh rock@$server_ip "nohup /home/rock/ARM_RETINAFACE/server/release/./server_detect $width $height $fps $client_ip > /dev/null 2>&1 & echo \$!")
 sleep 1
 /home/rock/ARM_RETINAFACE/client/src/./app $width $height $fps $device $format $server_ip
 

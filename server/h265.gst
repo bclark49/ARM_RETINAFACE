@@ -1,1 +1,0 @@
-gst-launch-1.0 udpsrc port=9002 ! application/x-rtp, media=video, clock-rate=90000, encoding-name=H265, payload=96 ! rtph265depay ! h265parse ! queue ! mppvideodec width=1920 height=1080 format=16 ! videoconvert ! kmssink

@@ -40,7 +40,6 @@ MainWindow::MainWindow(QWidget* parent, char* udp_src_str, char* cam_src_str ) :
 	cam_src_ptr = new Video_Proc (this, cam_src_str, false);
 
 	// Connect signals for consumer pipeline
-
 	connect (udp_src_ptr, &Video_Proc::finished, udp_src_ptr, &Video_Proc::deleteLater);
 	connect (udp_src_ptr, &Video_Proc::finished, udp_src_ptr, &Video_Proc::quit);
 	connect (udp_src_ptr, &Video_Proc::new_frame_sig, this, &MainWindow::updateFrameAfter);
@@ -52,7 +51,6 @@ MainWindow::MainWindow(QWidget* parent, char* udp_src_str, char* cam_src_str ) :
 	Tudpsrc_prev_end = std::chrono::steady_clock::now ();
 	udp_src_ptr->start ();
 	
-
 	// Connect signals for producer pipeline
 	connect (cam_src_ptr, &Video_Proc::finished, cam_src_ptr, &Video_Proc::deleteLater);
 	connect (cam_src_ptr, &Video_Proc::finished, cam_src_ptr, &Video_Proc::quit);
@@ -173,13 +171,16 @@ GstFlowReturn new_sample_callback (GstAppSink* sink, gpointer data) {
 			GstMapInfo map;
 			if (gst_buffer_map (buffer, &map, GST_MAP_READ)) {
 				cv::Mat m (cv::Size (WIDTH, HEIGHT), CV_8UC3, map.data);
-				//cv::cvtColor(m, m, cv::COLOR_BGR2RGB); 
-				//cv::UMat Um = m.getUMat (cv::ACCESS_RW, cv::USAGE_ALLOCATE_SHARED_MEMORY);
-				//cv::resize (m, m, cv::Size (cb_dat->vid_proc_ptr->display_width, 
-							//cb_dat->vid_proc_ptr->display_height), 0, 0, cv::INTER_NEAREST);
-				// the entire matrix is sent to stop dangling pointer
+				/* For resizing on GPU
+				cv::cvtColor(m, m, cv::COLOR_BGR2RGB); 
+				cv::UMat Um = m.getUMat (cv::ACCESS_RW, cv::USAGE_ALLOCATE_SHARED_MEMORY);
+				cv::resize (m, m, cv::Size (cb_dat->vid_proc_ptr->display_width, 
+							cb_dat->vid_proc_ptr->display_height), 0, 0, cv::INTER_NEAREST);
+				emit cb_dat->vid_proc_ptr->new_frame_sig (Um.getMat (cv::ACCESS_READ));
+				*/
+
+				// Clone of matrix is sent to stop dangling pointer
 				emit cb_dat->vid_proc_ptr->new_frame_sig (m.clone ());
-				//emit cb_dat->vid_proc_ptr->new_frame_sig (Um.getMat (cv::ACCESS_READ));
 				gst_buffer_unmap (buffer, &map);
 				gst_sample_unref (sample);
 				return GST_FLOW_OK;

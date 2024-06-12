@@ -154,13 +154,18 @@ int main(int argc, char** argv)
 			conf.res[0], conf.res[1], conf.fps, conf.dev, conf.format, conf.server_ip);
 	WIDTH = conf.res[0];
 	HEIGHT = conf.res[1];
-	char udp_src_str[512];
-	char cam_src_str[512];
-	sprintf (udp_src_str, "udpsrc port=9004 ! application/x-rtp, media=video, \
-			clock-rate=90000, encoding-name=H264, payload=96 ! rtph264depay ! \
-			h264parse ! queue ! \
-			mppvideodec width=%d height=%d format=16 ! appsink name=appsink sync=true", 
-			conf.res[0], conf.res[1]);
+
+	// Configure Gstreamer pipelines
+	gst_init(&argc, &argv);
+	//gst_debug_set_default_threshold(GST_LEVEL_INFO);
+	gst_debug_set_default_threshold(GST_LEVEL_ERROR);
+	int buffer_size = (WIDTH * HEIGHT * 3);
+	int max_buffers = 30;
+	int max_ns = 100;
+	char udp_src_str[1024];
+	char cam_src_str[1024];
+	sprintf (udp_src_str, "udpsrc port=9004 caps=\"application/x-rtp, media=video, clock-rate=90000, encoding-name=H265, alignment=au, payload=96\" ! rtph265depay ! video/x-h265, stream-format=byte-stream, alignment=au ! queue ! h265parse config-interval=1 ! queue ! mppvideodec format=16 width=%d height=%d ! appsink name=appsink blocksize=%d max-buffers=%d max-lateness=%d qos=true sync=false", 
+			conf.res[0], conf.res[1], buffer_size, max_buffers, max_ns);
 
 	/*sprintf (cam_src_str, "v4l2src device=%s num-buffers=1800 ! video/x-raw, format=%s, width=%d, height=%d, framerate=%d/1 ! tee name=t \
 			t. ! queue ! mpph264enc level=42 ! rtph264pay name=pay0 pt=96 config-interval=-1 ! application/x-rtp, media=video, clock-rate=90000, encoding-name=H264 ! udpsink name=udpsink host=%s port=9002 sync=false \
@@ -168,19 +173,17 @@ int main(int argc, char** argv)
 			conf.dev, conf.format, conf.res[0], conf.res[1], conf.fps, conf.server_ip);
 	*/
 
-	sprintf (cam_src_str, "v4l2src device=%s ! video/x-raw, format=%s, width=%d, height=%d, framerate=%d/1 ! tee name=t \
-			t. ! queue ! mpph264enc level=42 ! rtph264pay name=pay0 pt=96 config-interval=-1 ! application/x-rtp, media=video, clock-rate=90000, encoding-name=H264 ! udpsink name=udpsink host=%s port=9002 sync=false \
-			t. ! queue ! videoconvert ! appsink name=appsink sync=true",
-			conf.dev, conf.format, conf.res[0], conf.res[1], conf.fps, conf.server_ip);
+	sprintf (cam_src_str, "v4l2src device=%s blocksize=%d ! video/x-raw, format=%s, width=%d, height=%d, framerate=%d/1 ! tee name=t \
+			t. ! queue max-size-buffers=%d ! mpph265enc qos=true ! video/x-h265, width=%d, height=%d, stream-format=byte-stream, alignment=au ! queue max-size-buffers=%d ! rtph265pay name=pay0 config-interval=1 ! application/x-rtp, media=video, clock-rate=90000, encoding-name=H265, payload=96 ! udpsink name=udpsink host=%s port=9002 max-lateness=%d qos=true sync=false \
+			t. ! queue max-size-buffers=%d ! appsink name=appsink blocksize=%d max-buffers=%d max-lateness=%d qos=true sync=false",
+			conf.dev, buffer_size, conf.format, conf.res[0], conf.res[1], conf.fps, max_buffers, conf.res[0], conf.res[1], max_buffers, conf.server_ip, max_ns, max_buffers, buffer_size, max_buffers, max_ns);
 
-	gst_init(&argc, &argv);
 	// Configure QT application and start QT thread
 	qRegisterMetaType<cv::Mat>("cv::Mat");
-	//gst_debug_set_default_threshold(GST_LEVEL_INFO);
-	gst_debug_set_default_threshold(GST_LEVEL_ERROR);
 	QApplication app (argc, argv);
 	MainWindow w (nullptr, (char*)udp_src_str, (char*)cam_src_str);
 	w.show();
+
 	printf("STARTING WINDOW\n");
 	app.exec();
 	printf("Main returning\n");

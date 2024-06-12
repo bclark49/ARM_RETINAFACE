@@ -1,1 +1,0 @@
-gst-launch-1.0 v4l2src device=/dev/video0 ! video/x-raw, format=BGR, width=1920, height=1080, framerate=60/1 ! mpph265enc ! rtph265pay name=pay0 pt=96 ! udpsink host=169.254.73.214 port=9002 sync=false

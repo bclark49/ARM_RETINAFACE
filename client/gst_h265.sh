@@ -1,0 +1,5 @@
+#!/bin/bash
+
+#gst-launch-1.0 v4l2src device=/dev/video0 ! video/x-raw, width=1920, height=1080, framerate=60/1, format=BGR ! videoscale method=0 n-threads=4 ! video/x-raw, width=640, height=480, framerate=60/1 ! queue ! mpph265enc ! video/x-h265, width=640, height=480, stream-format=byte-stream, alignment=au ! queue ! h265parse config-interval=1 ! video/x-h265, parsed=true, stream-format=byte-stream, alignment=au ! queue ! rtph265pay ! application/x-rtp, media=video, clock-rate=90000, encoding-name=H265, payload=96 ! udpsink host=169.254.51.2 port=9002 sync=false
+
+gst-launch-1.0 v4l2src device=/dev/video0 ! video/x-raw, width=1920, height=1080, framerate=60/1, format=BGR ! queue ! mpph265enc ! video/x-h265, width=1920, height=1080, stream-format=byte-stream, alignment=au ! queue ! h265parse config-interval=1 ! video/x-h265, parsed=true, stream-format=byte-stream, alignment=au ! queue ! rtph265pay ! application/x-rtp, media=video, clock-rate=90000, encoding-name=H265, payload=96 ! udpsink host=169.254.51.2 port=9002 sync=true

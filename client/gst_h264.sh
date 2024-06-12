@@ -1,0 +1,1 @@
+gst-launch-1.0 v4l2src device=/dev/video0 !  video/x-raw, width=1920, height=1080, framerate=60/1, format=BGR ! queue ! mpph264enc level=42 ! h264parse ! queue ! rtph264pay name=pay1 pt=96 config-interval=1 ! application/x-rtp, media=video, clock-rate=90000, encoding-name=H264 ! udpsink host=169.254.51.2 port=9004 sync=false

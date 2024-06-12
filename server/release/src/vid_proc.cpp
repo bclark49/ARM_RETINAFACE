@@ -66,10 +66,10 @@ GstFlowReturn new_sample_callback (GstAppSink* sink, gpointer data) {
 				// Apply retinaface inference
 				std::vector<FaceObject> faceobjects;
 
-				cb_dat->detector->detect_retinaface(m, faceobjects);
-				int num_detects = faceobjects.size();
-				printf ("NUM DETECTS: %d\n", num_detects);
-				m = cb_dat->detector->draw_faceobjects(m, faceobjects);
+				//cb_dat->detector->detect_retinaface(m, faceobjects);
+				//int num_detects = faceobjects.size();
+				//printf ("NUM DETECTS: %d\n", num_detects);
+				//m = cb_dat->detector->draw_faceobjects(m, faceobjects);
 
 				GstBuffer* buf;
 				GstFlowReturn ret;
@@ -79,6 +79,7 @@ GstFlowReturn new_sample_callback (GstAppSink* sink, gpointer data) {
 				gst_buffer_fill (buf, 0, m.data, size);
 				g_signal_emit_by_name (cnsr, "push-buffer", buf, &ret);
 				
+				/*
 				std::chrono::steady_clock::time_point Tend = std::chrono::steady_clock::now();
 
 				float f = std::chrono::duration_cast <std::chrono::milliseconds> (Tend-cb_dat->Tbegin).count();
@@ -88,6 +89,7 @@ GstFlowReturn new_sample_callback (GstAppSink* sink, gpointer data) {
 				for (f=0.0, i=0; i<16; i++) {f+=cb_dat->FPS [i];}
 				printf ("%0.2f\n", f/16);
 				cb_dat->Tbegin = std::chrono::steady_clock::now();
+				*/
 
 				gst_buffer_unref (buf);
 				if (ret != GST_FLOW_OK) {

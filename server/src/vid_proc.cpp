@@ -9,7 +9,7 @@ int pack_num = 0;
 static void fps_callback (GstElement* sink, gdouble fps, gdouble droprate, gdouble avgfps, gpointer dat) {
 	guint64 num_frames;
 	g_object_get (sink, "frames_rendered", &num_frames, NULL);
-	printf ("CALLED(%d): %f, %f, %f\n", num_frames, fps, droprate, avgfps);
+	//printf ("CALLED(%d): %f, %f, %f\n", num_frames, fps, droprate, avgfps);
 	//const GValue* fps = gst_structure_get_value (s, "fps");
 	/*
 	if (fps) {
@@ -79,6 +79,7 @@ GstFlowReturn new_sample_callback (GstAppSink* sink, gpointer data) {
 				gst_buffer_fill (buf, 0, m.data, size);
 				g_signal_emit_by_name (cnsr, "push-buffer", buf, &ret);
 				
+				/*
 				std::chrono::steady_clock::time_point Tend = std::chrono::steady_clock::now();
 
 				float f = std::chrono::duration_cast <std::chrono::milliseconds> (Tend-cb_dat->Tbegin).count();
@@ -88,6 +89,7 @@ GstFlowReturn new_sample_callback (GstAppSink* sink, gpointer data) {
 				for (f=0.0, i=0; i<16; i++) {f+=cb_dat->FPS [i];}
 				printf ("%0.2f\n", f/16);
 				cb_dat->Tbegin = std::chrono::steady_clock::now();
+				*/
 
 				gst_buffer_unref (buf);
 				if (ret != GST_FLOW_OK) {
@@ -106,26 +108,7 @@ GstFlowReturn new_sample_callback (GstAppSink* sink, gpointer data) {
 	printf("GST_ERROR\n");
 	return GST_FLOW_ERROR;
 }
-/*
-GstFlowReturn push_sample_callback (GstElement* src, guint unused_size, gpointer dat) {
-	Callback_Data* cb_dat_ptr = static_cast<Callback_Data*>(dat);
-	//App_Pipe* ap_ptr = cb_dat_ptr->ap_ptr;
-	GstBuffer* buf;
-	GstFlowReturn ret;
-	cv::Mat img;
 
-	guint size = img.total () * img.elemSize ();	
-	buf = gst_buffer_new_allocate (NULL, size, NULL);
-	gst_buffer_fill (buf, 0, img.data, size);
-	g_signal_emit_by_name (src, "push-buffer", buf, &ret);
-	//num_buffers++;
-	//printf ("BUFFERS PUSHED: %d\n", num_buffers);
-	gst_buffer_unref (buf);
-	if (ret != GST_FLOW_OK) {
-		printf ("quiting loop\n");
-		g_main_loop_quit (cb_dat_ptr->loop);
-	}
-}
 GstPadProbeReturn probe_callback (GstPad* pad, GstPadProbeInfo* info, gpointer user_dat) {
 	GstBuffer* buffer = GST_PAD_PROBE_INFO_BUFFER (info);
 
@@ -137,7 +120,6 @@ GstPadProbeReturn probe_callback (GstPad* pad, GstPadProbeInfo* info, gpointer u
 	pack_num++;
 	return GST_PAD_PROBE_OK;
 }
-*/
 
 Video_Proc::Video_Proc (char* uri, int type, GstElement* cnsr) {
 	this->type = type;
@@ -149,6 +131,7 @@ Video_Proc::Video_Proc (char* uri, int type, GstElement* cnsr) {
 
 	if (type == 0) {
 		GstElement* sink = gst_bin_get_by_name (GST_BIN (pipeline), "sink");
+		GstElement* src = gst_bin_get_by_name (GST_BIN (pipeline), "udpsrc");
 		if (!sink) {
 			fprintf (stderr, "Failed to retrieve sppink. Exiting\n");
 			return;
@@ -160,6 +143,10 @@ Video_Proc::Video_Proc (char* uri, int type, GstElement* cnsr) {
 		for (int i=0; i<16; i++) cb_dat.FPS[i] = 0.0;
 		cb_dat.callback = {nullptr, nullptr, new_sample_callback, nullptr};
 		gst_app_sink_set_callbacks (GST_APP_SINK (sink), &cb_dat.callback, &cb_dat, nullptr);
+		// Access to udpsrc pad for latency measure
+		GstPad* pad = gst_element_get_static_pad (src, "src");
+		gst_pad_add_probe (pad, GST_PAD_PROBE_TYPE_BUFFER, probe_callback, NULL, NULL);
+		gst_object_unref (pad);
 		sleep (1);		// Make sure writer has started
 	}
 	else {

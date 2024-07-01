@@ -162,7 +162,13 @@ int main(int argc, char** argv)
 			mppvideodec width=%d height=%d format=16 ! appsink name=appsink sync=true", 
 			conf.res[0], conf.res[1]);
 
-	sprintf (cam_src_str, "v4l2src device=%s num-buffers=1800 ! video/x-raw, format=%s, width=%d, height=%d, framerate=%d/1 ! tee name=t \
+	/*sprintf (cam_src_str, "v4l2src device=%s num-buffers=1800 ! video/x-raw, format=%s, width=%d, height=%d, framerate=%d/1 ! tee name=t \
+			t. ! queue ! mpph264enc level=42 ! rtph264pay name=pay0 pt=96 config-interval=-1 ! application/x-rtp, media=video, clock-rate=90000, encoding-name=H264 ! udpsink name=udpsink host=%s port=9002 sync=false \
+			t. ! queue ! videoconvert ! appsink name=appsink sync=true",
+			conf.dev, conf.format, conf.res[0], conf.res[1], conf.fps, conf.server_ip);
+	*/
+
+	sprintf (cam_src_str, "v4l2src device=%s ! video/x-raw, format=%s, width=%d, height=%d, framerate=%d/1 ! tee name=t \
 			t. ! queue ! mpph264enc level=42 ! rtph264pay name=pay0 pt=96 config-interval=-1 ! application/x-rtp, media=video, clock-rate=90000, encoding-name=H264 ! udpsink name=udpsink host=%s port=9002 sync=false \
 			t. ! queue ! videoconvert ! appsink name=appsink sync=true",
 			conf.dev, conf.format, conf.res[0], conf.res[1], conf.fps, conf.server_ip);

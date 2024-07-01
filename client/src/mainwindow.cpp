@@ -40,29 +40,33 @@ MainWindow::MainWindow(QWidget* parent, char* udp_src_str, char* cam_src_str ) :
 	cam_src_ptr = new Video_Proc (this, cam_src_str, false);
 
 	// Connect signals for consumer pipeline
+
 	connect (udp_src_ptr, &Video_Proc::finished, udp_src_ptr, &Video_Proc::deleteLater);
 	connect (udp_src_ptr, &Video_Proc::finished, udp_src_ptr, &Video_Proc::quit);
 	connect (udp_src_ptr, &Video_Proc::new_frame_sig, this, &MainWindow::updateFrameAfter);
-	// Connect signals for producer pipeline
-	connect (cam_src_ptr, &Video_Proc::finished, cam_src_ptr, &Video_Proc::deleteLater);
-	connect (cam_src_ptr, &Video_Proc::finished, cam_src_ptr, &Video_Proc::quit);
-	connect (cam_src_ptr, &Video_Proc::new_frame_sig, this, &MainWindow::updateFrameBefore);
-	// To manipulate pipelines
-	connect (ui->startButton, &QPushButton::clicked, this, &MainWindow::toggleVideo);
-	connect (ui->stopButton, &QPushButton::clicked, this, &MainWindow::stopVideo);
-	connect (this, &MainWindow::stop_vid_proc, cam_src_ptr, &Video_Proc::set_term_sig);
-	connect (this, &MainWindow::stop_vid_proc, udp_src_ptr, &Video_Proc::set_term_sig);
+	connect (this, &MainWindow::stop_vid_proc, udp_src_ptr, &Video_Proc::set_term_sig);	
 
 	// Set up for FPS measurements
     for (int i=0; i<16; i++) udpsrc_FPS[i] = 0.0;
 	udpsrc_Fcnt = 0;
 	Tudpsrc_prev_end = std::chrono::steady_clock::now ();
+	udp_src_ptr->start ();
+	
+
+	// Connect signals for producer pipeline
+	connect (cam_src_ptr, &Video_Proc::finished, cam_src_ptr, &Video_Proc::deleteLater);
+	connect (cam_src_ptr, &Video_Proc::finished, cam_src_ptr, &Video_Proc::quit);
+	connect (cam_src_ptr, &Video_Proc::new_frame_sig, this, &MainWindow::updateFrameBefore);
+	connect (this, &MainWindow::stop_vid_proc, cam_src_ptr, &Video_Proc::set_term_sig);
+	// Set up for FPS measurements
     for (int i=0; i<16; i++) camsrc_FPS[i] = 0.0;
 	camsrc_Fcnt = 0;
 	Tcamsrc_prev_end = std::chrono::steady_clock::now ();
-
-	udp_src_ptr->start ();
 	cam_src_ptr->start ();
+
+	// To manipulate pipelines
+	connect (ui->startButton, &QPushButton::clicked, this, &MainWindow::toggleVideo);
+	connect (ui->stopButton, &QPushButton::clicked, this, &MainWindow::stopVideo);
 }
 
 // Free resources

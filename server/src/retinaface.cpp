@@ -1,6 +1,28 @@
+
+// Tencent is pleased to support the open source community by making ncnn available.
+//
+// Copyright (C) 2019 THL A29 Limited, a Tencent company. All rights reserved.
+//
+// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+// in compliance with the License. You may obtain a copy of the License at
+//
+// https://opensource.org/licenses/BSD-3-Clause
+//
+// Unless required by applicable law or agreed to in writing, software distributed
+// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+// CONDITIONS OF ANY KIND, either express or implied. See the License for the
+// specific language governing permissions and limitations under the License.
+
+//#include "my_gst.h"
 #include "retinaface.h"
 
-void qsort_descent_inplace(std::vector<FaceObject>& faceobjects, int left, int right)
+static inline float intersection_area(const FaceObject& a, const FaceObject& b)
+{
+    cv::Rect_<float> inter = a.rect & b.rect;
+    return inter.area();
+}
+
+static void qsort_descent_inplace(std::vector<FaceObject>& faceobjects, int left, int right)
 {
     int i = left;
     int j = right;
@@ -37,7 +59,7 @@ void qsort_descent_inplace(std::vector<FaceObject>& faceobjects, int left, int r
     }
 }
 
-void qsort_descent_inplace(std::vector<FaceObject>& faceobjects)
+static void qsort_descent_inplace(std::vector<FaceObject>& faceobjects)
 {
     if (faceobjects.empty())
         return;
@@ -45,7 +67,7 @@ void qsort_descent_inplace(std::vector<FaceObject>& faceobjects)
     qsort_descent_inplace(faceobjects, 0, faceobjects.size() - 1);
 }
 
-void nms_sorted_bboxes(const std::vector<FaceObject>& faceobjects, std::vector<int>& picked, float nms_threshold)
+static void nms_sorted_bboxes(const std::vector<FaceObject>& faceobjects, std::vector<int>& picked, float nms_threshold)
 {
     picked.clear();
 
@@ -79,8 +101,11 @@ void nms_sorted_bboxes(const std::vector<FaceObject>& faceobjects, std::vector<i
     }
 }
 
+Detector::Detector (ncnn::Net* net, ncnn::Extractor* ex) {
+}
+
 // copy from src/layer/proposal.cpp
-ncnn::Mat generate_anchors(int base_size, const ncnn::Mat& ratios, const ncnn::Mat& scales)
+ncnn::Mat Detector::generate_anchors(int base_size, const ncnn::Mat& ratios, const ncnn::Mat& scales)
 {
     int num_ratio = ratios.w;
     int num_scale = scales.w;
@@ -117,7 +142,7 @@ ncnn::Mat generate_anchors(int base_size, const ncnn::Mat& ratios, const ncnn::M
     return anchors;
 }
 
-void generate_proposals(const ncnn::Mat& anchors, int feat_stride, const ncnn::Mat& score_blob, const ncnn::Mat& bbox_blob, const ncnn::Mat& landmark_blob, float prob_threshold, std::vector<FaceObject>& faceobjects)
+void Detector::generate_proposals(const ncnn::Mat& anchors, int feat_stride, const ncnn::Mat& score_blob, const ncnn::Mat& bbox_blob, const ncnn::Mat& landmark_blob, float prob_threshold, std::vector<FaceObject>& faceobjects)
 {
     int w = score_blob.w;
     int h = score_blob.h;
@@ -199,7 +224,7 @@ void generate_proposals(const ncnn::Mat& anchors, int feat_stride, const ncnn::M
     }
 }
 
-int detect_retinaface(const cv::Mat& bgr, std::vector<FaceObject>& faceobjects)
+int Detector::detect_retinaface(const cv::Mat& bgr, std::vector<FaceObject>& faceobjects)
 {
     ncnn::Net retinaface;
 
@@ -211,9 +236,9 @@ int detect_retinaface(const cv::Mat& bgr, std::vector<FaceObject>& faceobjects)
     // the ncnn model https://github.com/nihui/ncnn-assets/tree/master/models
     //     retinaface.load_param("retinaface-R50.param");
     //     retinaface.load_model("retinaface-R50.bin");
-    if (retinaface.load_param("/home/rock/ARM_RETINAFACE/server/mnet.25-opt.param"))
+    if (retinaface.load_param("/home/rock/ARM_RETINAFACE/server/release/mnet.25-opt.param"))
         exit(-1);
-    if (retinaface.load_model("/home/rock/ARM_RETINAFACE/server/mnet.25-opt.bin"))
+    if (retinaface.load_model("/home/rock/ARM_RETINAFACE/server/release/mnet.25-opt.bin"))
         exit(-1);
 
     const float prob_threshold = 0.75f;
@@ -221,6 +246,7 @@ int detect_retinaface(const cv::Mat& bgr, std::vector<FaceObject>& faceobjects)
 
     int img_w = bgr.cols;
     int img_h = bgr.rows;
+	printf ("W/H: %d/%d\n", img_w, img_h);
 
     ncnn::Mat in = ncnn::Mat::from_pixels(bgr.data, ncnn::Mat::PIXEL_BGR2RGB, img_w, img_h);
 
@@ -330,7 +356,7 @@ int detect_retinaface(const cv::Mat& bgr, std::vector<FaceObject>& faceobjects)
     return 0;
 }
 
-cv::Mat draw_faceobjects(const cv::Mat& bgr, const std::vector<FaceObject>& faceobjects)
+cv::Mat Detector::draw_faceobjects(const cv::Mat& bgr, const std::vector<FaceObject>& faceobjects)
 {
     cv::Mat image = bgr.clone();
 
@@ -373,3 +399,4 @@ cv::Mat draw_faceobjects(const cv::Mat& bgr, const std::vector<FaceObject>& face
     //cv::imshow("image", image);
     //cv::waitKey(0);
 }
+
